@@ -12,11 +12,7 @@ WEBHOOK_URL_ENV = "DISCORD_WEBHOOK"
 NEIS_KEY_ENV = "NEIS_API_KEY"
 
 OFFICE_CODE = "B10"
-<<<<<<< HEAD
-SCHOOL_CODE = "7010663"
-=======
-SCHOOL_CODE = "710965"  # 동양고등학교
->>>>>>> 169e97f (change cron time to 5:50 KST)
+SCHOOL_CODE = "7010965"  # 동양고등학교
 GRADE = "1"
 CLASS_NM = "2"
 
@@ -27,7 +23,7 @@ HOLIDAY_KEYWORDS = [
     "휴업일",
     "재량휴업일",
     "방학",
-    "수련활동"
+    "수련활동",
     "수학여행"
 ]
 
@@ -73,6 +69,7 @@ def is_holiday(session: requests.Session, key: str, today: date) -> bool:
         res = session.get(url, params=params, timeout=10)
         res.raise_for_status()
         data = res.json()
+        log.info(data)
         if is_neis_empty(data, "SchoolSchedule"):
             return False
         rows = data["SchoolSchedule"][1].get("row", [])
