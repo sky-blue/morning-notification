@@ -20,7 +20,7 @@ KST = ZoneInfo("Asia/Seoul")
 
 # 쉬는 날 키워드 - 추가하고 싶으면 여기에 넣으면 됨
 HOLIDAY_KEYWORDS = [
-    "휴업일",
+    "휴업",
     "재량휴업일",
     "방학",
 ]
