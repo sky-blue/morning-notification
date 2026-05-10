@@ -12,7 +12,11 @@ WEBHOOK_URL_ENV = "DISCORD_WEBHOOK"
 NEIS_KEY_ENV = "NEIS_API_KEY"
 
 OFFICE_CODE = "B10"
+<<<<<<< HEAD
 SCHOOL_CODE = "7010663"
+=======
+SCHOOL_CODE = "710965"  # 동양고등학교
+>>>>>>> 169e97f (change cron time to 5:50 KST)
 GRADE = "1"
 CLASS_NM = "2"
 
