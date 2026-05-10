@@ -110,7 +110,7 @@ def get_meals(session: requests.Session, key: str, today: date) -> list[dict]:
 
     lunch = fetch_meal(session, key, today, "2")
     fields.append({
-        "name": "🥗 중식",
+        "name": "# 중식",
         "value": (lunch or "⚠️ 중식 정보 없음")[:1024],
         "inline": False,
     })
@@ -119,7 +119,7 @@ def get_meals(session: requests.Session, key: str, today: date) -> list[dict]:
         dinner = fetch_meal(session, key, today, "3")
         if dinner:
             fields.append({
-                "name": "🌙 석식",
+                "name": "# 석식",
                 "value": dinner[:1024],
                 "inline": False,
             })
@@ -162,7 +162,7 @@ def build_embed(today: date, subjects: list[str], source: str, meal_fields: list
 
     fields = [
         {
-            "name": f"📚 시간표 ({source})",
+            "name": f"# 시간표 ({source})",
             "value": timetable_value[:1024],
             "inline": False,
         },
@@ -170,7 +170,7 @@ def build_embed(today: date, subjects: list[str], source: str, meal_fields: list
     ]
 
     return {
-        "title": f"🌅  {today.strftime('%Y-%m-%d')} {day}요일 좋은 아침!",
+        "title": f"{today.strftime('%Y-%m-%d')} {day}요일 좋은 아침!",
         "color": DAY_COLORS.get(today.weekday(), 0x95A5A6),
         "fields": fields,
         "footer": {"text": "동양고등학교 1학년 2반"},
@@ -209,10 +209,10 @@ def main() -> None:
             return
 
         subjects = get_timetable_api(session, neis_key, today)
-        source = "📡 NEIS"
+        source = "NEIS"
         if not subjects:
             subjects = TIMETABLE.get(today.weekday(), [])
-            source = "📋 저장됨"
+            source = "저장됨"
 
         meal_fields = get_meals(session, neis_key, today)
         embed = build_embed(today, subjects, source, meal_fields)
