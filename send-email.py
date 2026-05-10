@@ -12,7 +12,7 @@ WEBHOOK_URL_ENV = "DISCORD_WEBHOOK"
 NEIS_KEY_ENV = "NEIS_API_KEY"
 
 OFFICE_CODE = "B10"
-SCHOOL_CODE = "7010663"  # 동양고등학교
+SCHOOL_CODE = "7010663"
 GRADE = "1"
 CLASS_NM = "2"
 
@@ -23,6 +23,8 @@ HOLIDAY_KEYWORDS = [
     "휴업일",
     "재량휴업일",
     "방학",
+    "수련활동"
+    "수학여행"
 ]
 
 TIMETABLE: dict[int, list[str]] = {
