@@ -17,3 +17,4 @@ jobs:
       - run: python send-email.py
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
