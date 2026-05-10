@@ -1,20 +1,19 @@
-name: 매일 아침 이메일
+name: 매일 아침 알림
 
 on:
   schedule:
-    - cron: '0 23 * * *'  # 한국시간 오전 8시
+    - cron: '30 21 * * *'  # 한국시간 오전 6시 30분
   workflow_dispatch:
 
 jobs:
-  send-email:
+  send-discord:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - run: pip install requests
       - run: python send-email.py
         env:
-          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
