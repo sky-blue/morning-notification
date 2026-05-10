@@ -18,6 +18,13 @@ CLASS_NM = "2"
 
 KST = ZoneInfo("Asia/Seoul")
 
+# 쉬는 날 키워드 - 추가하고 싶으면 여기에 넣으면 됨
+HOLIDAY_KEYWORDS = [
+    "휴업일",
+    "재량휴업일",
+    "방학",
+]
+
 TIMETABLE: dict[int, list[str]] = {
     0: ["공영짝(영어교실)", "미술", "한국사", "공수", "통과C", "공국", "통사D", "방과후영어"],
     1: ["통사B", "한국사", "체육", "정보A", "미술", "미술", "공국", "방과후수학"],
@@ -45,6 +52,33 @@ def get_env(key: str) -> str:
 def is_neis_empty(data: dict, key: str) -> bool:
     """NEIS INFO-200 (데이터 없음) 응답 확인"""
     return "RESULT" in data and data["RESULT"].get("CODE") == "INFO-200" or key not in data
+
+
+def is_holiday(session: requests.Session, key: str, today: date) -> bool:
+    url = "https://open.neis.go.kr/hub/SchoolSchedule"
+    params = {
+        "KEY": key, "Type": "json",
+        "ATPT_OFCDC_SC_CODE": OFFICE_CODE,
+        "SD_SCHUL_CODE": SCHOOL_CODE,
+        "AA_FROM_YMD": today.strftime("%Y%m%d"),
+        "AA_TO_YMD": today.strftime("%Y%m%d"),
+    }
+    try:
+        res = session.get(url, params=params, timeout=10)
+        res.raise_for_status()
+        data = res.json()
+        if is_neis_empty(data, "SchoolSchedule"):
+            return False
+        rows = data["SchoolSchedule"][1].get("row", [])
+        for row in rows:
+            event = row.get("EVENT_NM", "")
+            if any(keyword in event for keyword in HOLIDAY_KEYWORDS):
+                log.info(f"쉬는 날 감지: {event}, 전송 생략")
+                return True
+        return False
+    except Exception as e:
+        log.warning(f"학사일정 조회 실패, 그냥 전송: {e}")
+        return False
 
 
 def fetch_meal(session: requests.Session, key: str, today: date, meal_code: str) -> str | None:
@@ -171,6 +205,9 @@ def main() -> None:
         return
 
     with requests.Session() as session:
+        if is_holiday(session, neis_key, today):
+            return
+
         subjects = get_timetable_api(session, neis_key, today)
         source = "📡 NEIS"
         if not subjects:
