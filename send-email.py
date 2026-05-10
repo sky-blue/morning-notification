@@ -20,7 +20,7 @@ KST = ZoneInfo("Asia/Seoul")
 
 # 쉬는 날 키워드 - 추가하고 싶으면 여기에 넣으면 됨
 HOLIDAY_KEYWORDS = [
-    "휴업",
+    "휴업일",
     "재량휴업일",
     "방학",
 ]
@@ -179,7 +179,7 @@ def build_embed(today: date, subjects: list[str], source: str, meal_fields: list
 
 def send_discord(session: requests.Session, webhook_url: str, embed: dict) -> None:
     try:
-        res = session.post(webhook_url, json={"embeds": [embed]}, timeout=10)
+        res = session.post(webhook_url, json={"content": "@everyone", "embeds": [embed]}, timeout=10)
         res.raise_for_status()
         log.info("디스코드 전송 성공")
     except Exception as e:
