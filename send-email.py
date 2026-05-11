@@ -51,10 +51,15 @@ def get_env(key: str) -> str:
     return val
 
 
+#def is_neis_empty(data: dict, key: str) -> bool:
+#    """NEIS INFO-200 (데이터 없음) 응답 확인"""
+#    return "RESULT" in data and data["RESULT"].get("CODE") == "INFO-200" or key not in data
 def is_neis_empty(data: dict, key: str) -> bool:
-    """NEIS INFO-200 (데이터 없음) 응답 확인"""
-    return "RESULT" in data and data["RESULT"].get("CODE") == "INFO-200" or key not in data
-
+    if key not in data:
+        return True
+    if "RESULT" in data and data["RESULT"].get("CODE") == "INFO-200":
+        return True
+    return False
 
 def is_holiday(session: requests.Session, key: str, today: date) -> bool:
     url = "https://open.neis.go.kr/hub/SchoolSchedule"

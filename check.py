@@ -11,4 +11,12 @@ params = {
     "AA_TO_YMD": "20260511",
 }
 res = requests.get(url, params=params)
-print(res.json())
+data = res.json()
+print(data)
+HOLIDAY_KEYWORDS = ["휴업일", "재량휴업일", "방학", "수련활동"]
+
+rows = data["SchoolSchedule"][1].get("row", [])
+for row in rows:
+    event = row.get("EVENT_NM", "")
+    print(f"EVENT_NM: '{event}'")
+    print(any(keyword in event for keyword in HOLIDAY_KEYWORDS))
