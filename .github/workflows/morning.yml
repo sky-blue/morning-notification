@@ -2,7 +2,7 @@ name: 매일 아침 알림
 
 on:
   schedule:
-    - cron: '0 20 * * *'  # 한국시간 오전 5시 50분
+    - cron: '0 20 * * *'  # 한국시간 오전 5시 00분
   workflow_dispatch:
 
 jobs:
