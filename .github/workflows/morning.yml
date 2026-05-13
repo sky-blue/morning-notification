@@ -2,7 +2,7 @@ name: 매일 아침 알림
 
 on:
   schedule:
-    - cron: '50 20 * * *'  # 한국시간 오전 5시 50분
+    - cron: '0 20 * * *'  # 한국시간 오전 5시 50분
   workflow_dispatch:
 
 jobs:
@@ -16,5 +16,10 @@ jobs:
       - run: pip install requests
       - run: python send-email.py
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
+          DISCORD_WEBHOOK_1_1: ${{ secrets.DISCORD_WEBHOOK_1_1 }}
+          DISCORD_WEBHOOK_1_2: ${{ secrets.DISCORD_WEBHOOK_1_2 }}
+          DISCORD_WEBHOOK_1_3: ${{ secrets.DISCORD_WEBHOOK_1_3 }}
+          DISCORD_WEBHOOK_1_4: ${{ secrets.DISCORD_WEBHOOK_1_4 }}
+          DISCORD_WEBHOOK_1_5: ${{ secrets.DISCORD_WEBHOOK_1_5 }}
+          DISCORD_WEBHOOK_1_6: ${{ secrets.DISCORD_WEBHOOK_1_6 }}

@@ -8,14 +8,10 @@ from zoneinfo import ZoneInfo
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
-WEBHOOK_URL_ENV = "DISCORD_WEBHOOK"
 NEIS_KEY_ENV = "NEIS_API_KEY"
 
 OFFICE_CODE = "B10"
-SCHOOL_CODE = "7010965"  # 동양고등학교
-GRADE = "1"
-CLASS_NM = "2"
-
+SCHOOL_CODE = "7010965"
 KST = ZoneInfo("Asia/Seoul")
 
 # 쉬는 날 키워드 - 추가하고 싶으면 여기에 넣으면 됨
@@ -24,15 +20,69 @@ HOLIDAY_KEYWORDS = [
     "재량휴업일",
     "방학",
     "수련활동",
-    "수학여행"
 ]
 
-TIMETABLE: dict[int, list[str]] = {
-    0: ["공영짝(영어교실)", "미술", "한국사", "공수", "통과C", "공국", "통사D", "방과후영어"],
-    1: ["통사B", "한국사", "체육", "정보A", "미술", "미술", "공국", "방과후수학"],
-    2: ["과탐", "공영교과서(1-2)", "통과B", "공수"],
-    3: ["한국사", "체육", "통사A", "공국", "통과A", "공수", "정보A", "방과후영어"],
-    4: ["정보B", "공국", "진로", "통사C", "공수", "통과D", "공영홀(1-1)", "방과후수학"],
+ROLE_IDS = {
+    (1, 1): "1504064435193647105",
+    (1, 2): "1504064479586160670",
+    (1, 3): "1504064500448366704",
+    (1, 4): "1504064519587233853",
+    (1, 5): "1504064539497599006",
+    (1, 6): "1504064560355741776"
+}
+
+WEBHOOKS = {
+    (1, 1): os.environ.get("DISCORD_WEBHOOK_1_1"),
+    (1, 2): os.environ.get("DISCORD_WEBHOOK_1_2"),
+    (1, 3): os.environ.get("DISCORD_WEBHOOK_1_3"),
+    (1, 4): os.environ.get("DISCORD_WEBHOOK_1_4"),
+    (1, 5): os.environ.get("DISCORD_WEBHOOK_1_5"),
+    (1, 6): os.environ.get("DISCORD_WEBHOOK_1_6"),
+}
+
+TIMETABLES = {
+    (1, 1): {
+        0: ["공영", "한국", "통사1", "공수", "정보", "공국", "통과"],
+        1: ["한국", "미술", "공국", "체육1", "과탐1", "통과", "통사1"],
+        2: ["공국", "공영", "통과", "공수"],
+        3: ["정보", "통사1", "미술", "미술", "진로1", "공수", "한국"],
+        4: ["통사1", "정보", "통과", "공국", "공수", "체육1", "공영"],
+    },
+    (1, 2): {
+        0: ["공영", "미술", "한국", "공수", "통과", "공국", "통사1"],
+        1: ["통사1", "한국", "체육1", "정보", "미술", "미술", "공국"],
+        2: ["과탐1", "공영", "통과", "공수"],
+        3: ["한국", "체육1", "통사1", "공국", "통과", "공수", "정보"],
+        4: ["정보", "공국", "진로1", "통사1", "공수", "통과", "공영"],
+    },
+    (1, 3): {
+        0: ["공수", "과탐1", "체육1", "공국", "미술", "통사1", "공영"],
+        1: ["통사1", "공영", "공국", "통과", "한국", "정보", "공수"],
+        2: ["통과", "통사1", "공수", "정보"],
+        3: ["공영", "공국", "공수", "체육1", "한국", "진로1", "통과"],
+        4: ["한국", "공국", "정보", "통과", "통사1", "미술", "미술"],
+    },
+    (1, 4): {
+        0: ["공수", "음악", "과탐1", "통과", "한국", "통사1", "공영"],
+        1: ["체육1", "공영", "정보", "통사1", "진로1", "공국", "공수"],
+        2: ["통사1", "통과", "공수", "공국"],
+        3: ["공영", "한국", "공수", "정보", "통과", "통사1", "공국"],
+        4: ["체육1", "정보", "한국", "공국", "통과", "음악", "음악"],
+    },
+    (1, 5): {
+        0: ["통사1", "공수", "공영", "통과", "정보", "진로1", "체육1"],
+        1: ["정보", "통사1", "음악", "음악", "공수", "공국", "통과"],
+        2: ["공국", "한국", "체육1", "공영"],
+        3: ["공국", "공영", "통과", "한국", "공수", "정보", "통사1"],
+        4: ["공국", "음악", "공수", "과탐1", "통사1", "한국", "통과"],
+    },
+    (1, 6): {
+        0: ["통사1", "공수", "공영", "공국", "음악", "통과", "정보"],
+        1: ["공국", "통사1", "진로1", "체육1", "공수", "한국", "과탐1"],
+        2: ["통과", "통사1", "한국", "공영"],
+        3: ["공국", "공영", "음악", "음악", "공수", "통과", "정보"],
+        4: ["체육1", "통사1", "공수", "한국", "정보", "공국", "통과"],
+    },
 }
 
 DAY_COLORS = {
@@ -51,9 +101,6 @@ def get_env(key: str) -> str:
     return val
 
 
-#def is_neis_empty(data: dict, key: str) -> bool:
-#    """NEIS INFO-200 (데이터 없음) 응답 확인"""
-#    return "RESULT" in data and data["RESULT"].get("CODE") == "INFO-200" or key not in data
 def is_neis_empty(data: dict, key: str) -> bool:
     if key not in data:
         return True
@@ -61,7 +108,8 @@ def is_neis_empty(data: dict, key: str) -> bool:
         return True
     return False
 
-def is_holiday(session: requests.Session, key: str, today: date) -> bool:
+
+def get_schedule_events(session: requests.Session, key: str, today: date) -> list[str]:
     url = "https://open.neis.go.kr/hub/SchoolSchedule"
     params = {
         "KEY": key, "Type": "json",
@@ -74,19 +122,21 @@ def is_holiday(session: requests.Session, key: str, today: date) -> bool:
         res = session.get(url, params=params, timeout=10)
         res.raise_for_status()
         data = res.json()
-        log.info(data)
         if is_neis_empty(data, "SchoolSchedule"):
-            return False
+            return []
         rows = data["SchoolSchedule"][1].get("row", [])
-        for row in rows:
-            event = row.get("EVENT_NM", "")
-            if any(keyword in event for keyword in HOLIDAY_KEYWORDS):
-                log.info(f"쉬는 날 감지: {event}, 전송 생략")
-                return True
-        return False
+        return [row.get("EVENT_NM", "") for row in rows if row.get("EVENT_NM")]
     except Exception as e:
-        log.warning(f"학사일정 조회 실패, 그냥 전송: {e}")
-        return False
+        log.warning(f"학사일정 조회 실패: {e}")
+        return []
+
+
+def is_holiday(events: list[str]) -> bool:
+    for event in events:
+        if any(keyword in event for keyword in HOLIDAY_KEYWORDS):
+            log.info(f"쉬는 날 감지: {event}, 전송 생략")
+            return True
+    return False
 
 
 def fetch_meal(session: requests.Session, key: str, today: date, meal_code: str) -> str | None:
@@ -119,7 +169,7 @@ def get_meals(session: requests.Session, key: str, today: date) -> list[dict]:
     lunch = fetch_meal(session, key, today, "2")
     fields.append({
         "name": "# 중식",
-        "value": (lunch or "⚠️ 중식 정보 없음")[:1024],
+        "value": (lunch or "중식 정보 없음")[:1024],
         "inline": False,
     })
 
@@ -135,42 +185,16 @@ def get_meals(session: requests.Session, key: str, today: date) -> list[dict]:
     return fields
 
 
-def get_timetable_api(session: requests.Session, key: str, today: date) -> list[str] | None:
-    url = "https://open.neis.go.kr/hub/hisTimetable"
-    params = {
-        "KEY": key, "Type": "json",
-        "ATPT_OFCDC_SC_CODE": OFFICE_CODE,
-        "SD_SCHUL_CODE": SCHOOL_CODE,
-        "AY": today.year,
-        "GRADE": GRADE,
-        "CLASS_NM": CLASS_NM,
-        "TI_FROM_YMD": today.strftime("%Y%m%d"),
-        "TI_TO_YMD": today.strftime("%Y%m%d"),
-    }
-    try:
-        res = session.get(url, params=params, timeout=10)
-        res.raise_for_status()
-        data = res.json()
-        if is_neis_empty(data, "hisTimetable"):
-            return None
-        rows = data["hisTimetable"][1].get("row", [])
-        if not rows:
-            return None
-        return [r["ITRT_CNTNT"] for r in sorted(rows, key=lambda x: x["PERIO"])]
-    except Exception as e:
-        log.warning(f"시간표 API 실패, 로컬로 대체: {e}")
-        return None
-
-
-def build_embed(today: date, subjects: list[str], source: str, meal_fields: list[dict]) -> dict:
+def build_embed(today: date, grade: int, class_num: int, subjects: list[str], meal_fields: list[dict], events: list[str]) -> dict:
     day_names = ["월", "화", "수", "목", "금"]
     day = day_names[today.weekday()]
 
     timetable_value = "\n".join(f"`{i+1}교시` {s}" for i, s in enumerate(subjects))
+    description = f"# 학사일정: {', '.join(events)}" if events else ""
 
     fields = [
         {
-            "name": f"# 시간표 ({source})",
+            "name": "# 시간표",
             "value": timetable_value[:1024],
             "inline": False,
         },
@@ -179,21 +203,22 @@ def build_embed(today: date, subjects: list[str], source: str, meal_fields: list
 
     return {
         "title": f"{today.strftime('%Y-%m-%d')} {day}요일 좋은 아침!",
+        "description": description,
         "color": DAY_COLORS.get(today.weekday(), 0x95A5A6),
         "fields": fields,
-        "footer": {"text": "동양고등학교 1학년 2반"},
+        "footer": {"text": f"동양고등학교 {grade}학년 {class_num}반"},
     }
 
 
-def send_discord(session: requests.Session, webhook_url: str, embed: dict) -> None:
+def send_discord(session: requests.Session, webhook_url: str, embed: dict, grade: int, class_num: int) -> None:
     try:
-        res = session.post(webhook_url, json={"content": "@everyone", "embeds": [embed]}, timeout=10)
+        res = session.post(webhook_url, json={"content": f"<@&{ROLE_IDS[(grade, class_num)]}>", "embeds": [embed]}, timeout=10)
         res.raise_for_status()
-        log.info("디스코드 전송 성공")
+        log.info(f"{grade}학년 {class_num}반 디스코드 전송 성공")
     except Exception as e:
-        log.error(f"디스코드 전송 실패: {e}")
+        log.error(f"{grade}학년 {class_num}반 디스코드 전송 실패: {e}")
         try:
-            session.post(webhook_url, json={"content": f"⚠️ 오류 발생: {e}"}, timeout=10)
+            session.post(webhook_url, json={"content": f"오류 발생: {e}"}, timeout=10)
         except Exception:
             pass
 
@@ -206,25 +231,26 @@ def main() -> None:
         return
 
     try:
-        webhook_url = get_env(WEBHOOK_URL_ENV)
         neis_key = get_env(NEIS_KEY_ENV)
     except EnvironmentError as e:
         log.error(e)
         return
 
     with requests.Session() as session:
-        if is_holiday(session, neis_key, today):
+        events = get_schedule_events(session, neis_key, today)
+        if is_holiday(events):
             return
 
-        subjects = get_timetable_api(session, neis_key, today)
-        source = "NEIS"
-        if not subjects:
-            subjects = TIMETABLE.get(today.weekday(), [])
-            source = "저장됨"
-
         meal_fields = get_meals(session, neis_key, today)
-        embed = build_embed(today, subjects, source, meal_fields)
-        send_discord(session, webhook_url, embed)
+
+        for (grade, class_num), webhook in WEBHOOKS.items():
+            if not webhook:
+                log.warning(f"{grade}학년 {class_num}반 Webhook 없음, 건너뜀")
+                continue
+
+            subjects = TIMETABLES.get((grade, class_num), {}).get(today.weekday(), [])
+            embed = build_embed(today, grade, class_num, subjects, meal_fields, events)
+            send_discord(session, webhook, embed, grade, class_num)
 
 
 main()
