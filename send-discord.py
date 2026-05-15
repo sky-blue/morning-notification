@@ -1,44 +1,34 @@
 import re
+import json
 import logging
 import os
+import sys
 import requests
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
 NEIS_KEY_ENV = "NEIS_API_KEY"
+ADMIN_WEBHOOK_ENV = "DISCORD_WEBHOOK_ADMIN"
 OFFICE_CODE = "B10"
 SCHOOL_CODE = "7010965"
 KST = ZoneInfo("Asia/Seoul")
 
-# 쉬는 날 키워드 - 추가하고 싶으면 여기에 넣으면 됨
 HOLIDAY_KEYWORDS = [
     "휴업일",
-    "휴일",
     "재량휴업일",
     "방학",
     "수련활동",
-    "대체휴업일",
-    "졸업식",
-    "종업식",
-    "체육대회",
-    "개학식",
-    "기말고사",
-    "중간고사",
-    "학력평가",
-    "수능"
-    "수학능력시험"
-    "모의고사"
 ]
 
 DAY_COLORS = {
-    0: 0x3498DB,  # 월 - 파랑
-    1: 0xE74C3C,  # 화 - 빨강
-    2: 0x2ECC71,  # 수 - 초록
-    3: 0xE67E22,  # 목 - 주황
-    4: 0x9B59B6,  # 금 - 보라
+    0: 0x3498DB,
+    1: 0xE74C3C,
+    2: 0x2ECC71,
+    3: 0xE67E22,
+    4: 0x9B59B6,
 }
 
 CLASSES = {
@@ -126,14 +116,27 @@ def is_neis_empty(data: dict, key: str) -> bool:
     return False
 
 
-def get_schedule_events(session: requests.Session, key: str, today: date) -> list[str]:
+def load_override(target: date) -> dict:
+    """override.json 에서 날짜 키 반환, 없으면 빈 dict"""
+    try:
+        with open("override.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get(target.strftime("%Y-%m-%d"), {})
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        log.warning(f"override.json 읽기 실패: {e}")
+        return {}
+
+
+def get_schedule_events(session: requests.Session, key: str, target: date) -> list[str]:
     url = "https://open.neis.go.kr/hub/SchoolSchedule"
     params = {
         "KEY": key, "Type": "json",
         "ATPT_OFCDC_SC_CODE": OFFICE_CODE,
         "SD_SCHUL_CODE": SCHOOL_CODE,
-        "AA_FROM_YMD": today.strftime("%Y%m%d"),
-        "AA_TO_YMD": today.strftime("%Y%m%d"),
+        "AA_FROM_YMD": target.strftime("%Y%m%d"),
+        "AA_TO_YMD": target.strftime("%Y%m%d"),
     }
     try:
         res = session.get(url, params=params, timeout=10)
@@ -151,18 +154,18 @@ def get_schedule_events(session: requests.Session, key: str, today: date) -> lis
 def is_holiday(events: list[str]) -> bool:
     for event in events:
         if any(keyword in event for keyword in HOLIDAY_KEYWORDS):
-            log.info(f"쉬는 날 감지: {event}, 전송 생략")
+            log.info(f"쉬는 날 감지: {event}")
             return True
     return False
 
 
-def fetch_meal(session: requests.Session, key: str, today: date, meal_code: str) -> str | None:
+def fetch_meal(session: requests.Session, key: str, target: date, meal_code: str) -> str | None:
     url = "https://open.neis.go.kr/hub/mealServiceDietInfo"
     params = {
         "KEY": key, "Type": "json",
         "ATPT_OFCDC_SC_CODE": OFFICE_CODE,
         "SD_SCHUL_CODE": SCHOOL_CODE,
-        "MLSV_YMD": today.strftime("%Y%m%d"),
+        "MLSV_YMD": target.strftime("%Y%m%d"),
         "MMEAL_SC_CODE": meal_code,
     }
     try:
@@ -180,39 +183,37 @@ def fetch_meal(session: requests.Session, key: str, today: date, meal_code: str)
         return None
 
 
-def get_meals(session: requests.Session, key: str, today: date) -> list[dict]:
-    fields = []
+def get_meals(session: requests.Session, key: str, today: date, override: dict) -> tuple[str, str | None] | None:
+    lunch_api = fetch_meal(session, key, today, "2")
 
-    lunch = fetch_meal(session, key, today, "2")
-    fields.append({
-        "name": "# 중식",
-        "value": (lunch or "중식 정보 없음")[:1024],
-        "inline": False,
-    })
+    if lunch_api:
+        log.info("급식 API 성공")
+        dinner = fetch_meal(session, key, today, "3") if today.weekday() != 2 else None
+        return lunch_api, dinner
 
-    if today.weekday() != 2:
-        dinner = fetch_meal(session, key, today, "3")
-        if dinner:
-            fields.append({
-                "name": "# 석식",
-                "value": dinner[:1024],
-                "inline": False,
-            })
+    log.warning("급식 API 실패, override 확인")
+    meal_override = override.get("meal")
+    if meal_override:
+        log.info("급식 override 사용")
+        lunch = meal_override.get("lunch")
+        dinner = meal_override.get("dinner")
+        return lunch, dinner
 
-    return fields
+    log.warning("급식 정보 없음 (API + override 모두 없음)")
+    return None
 
 
-def get_timetable_api(session: requests.Session, key: str, today: date, grade: int, class_num: int) -> list[str] | None:
+def get_timetable_api(session: requests.Session, key: str, target: date, grade: int, class_num: int) -> list[str] | None:
     url = "https://open.neis.go.kr/hub/hisTimetable"
     params = {
         "KEY": key, "Type": "json",
         "ATPT_OFCDC_SC_CODE": OFFICE_CODE,
         "SD_SCHUL_CODE": SCHOOL_CODE,
-        "AY": today.year,
+        "AY": target.year,
         "GRADE": str(grade),
         "CLASS_NM": str(class_num),
-        "TI_FROM_YMD": today.strftime("%Y%m%d"),
-        "TI_TO_YMD": today.strftime("%Y%m%d"),
+        "TI_FROM_YMD": target.strftime("%Y%m%d"),
+        "TI_TO_YMD": target.strftime("%Y%m%d"),
     }
     try:
         res = session.get(url, params=params, timeout=10)
@@ -223,18 +224,45 @@ def get_timetable_api(session: requests.Session, key: str, today: date, grade: i
         rows = data["hisTimetable"][1].get("row", [])
         if not rows:
             return None
-        return [r["ITRT_CNTNT"] for r in sorted(rows, key=lambda x: x["PERIO"])]
+        return [r["ITRT_CNTNT"] for r in sorted(rows, key=lambda x: int(x.get("PERIO", 0)))]
     except Exception as e:
-        log.warning(f"{grade}학년 {class_num}반 시간표 API 실패, 로컬로 대체: {e}")
+        log.warning(f"{grade}학년 {class_num}반 시간표 API 실패: {e}")
         return None
 
 
-def build_embed(today: date, grade: int, class_num: int, subjects: list[str], source: str, meal_fields: list[dict], events: list[str]) -> dict:
+def summarize_meal(meal: str | None) -> str:
+    if not meal:
+        return "⚠️ 없음"
+    lines = [l for l in meal.splitlines() if l.strip()]
+    if len(lines) <= 1:
+        return lines[0] if lines else "⚠️ 없음"
+    return f"{lines[0]} 외 {len(lines)-1}종"
+
+
+def build_embed(
+    today: date,
+    grade: int,
+    class_num: int,
+    subjects: list[str],
+    source: str,
+    lunch: str,
+    dinner: str | None,
+    events: list[str],
+    normal_count: int,
+) -> dict:
     day_names = ["월", "화", "수", "목", "금"]
     day = day_names[today.weekday()]
 
     timetable_value = "\n".join(f"`{i+1}교시` {s}" for i, s in enumerate(subjects))
-    description = f"학사일정: {', '.join(events)}" if events else ""
+
+    # 평소보다 교시 수 다를 때 (API 사용할 때만)
+    if source == "📡 NEIS" and len(subjects) != normal_count:
+        if len(subjects) < normal_count:
+            timetable_value += f"\n⚠️ 오늘 {len(subjects)}교시 (평소 {normal_count}교시)"
+        else:
+            timetable_value += f"\n📢 오늘 {len(subjects)}교시 (평소 {normal_count}교시)"
+
+    description = f"# 학사일정: {', '.join(events)}" if events else ""
 
     fields = [
         {
@@ -242,8 +270,19 @@ def build_embed(today: date, grade: int, class_num: int, subjects: list[str], so
             "value": timetable_value[:1024],
             "inline": False,
         },
-        *meal_fields,
+        {
+            "name": "# 중식",
+            "value": lunch[:1024],
+            "inline": False,
+        },
     ]
+
+    if dinner:
+        fields.append({
+            "name": "# 석식",
+            "value": dinner[:1024],
+            "inline": False,
+        })
 
     return {
         "title": f"{today.strftime('%Y-%m-%d')} {day}요일 좋은 아침!",
@@ -254,20 +293,122 @@ def build_embed(today: date, grade: int, class_num: int, subjects: list[str], so
     }
 
 
-def send_discord(session: requests.Session, webhook_url: str, embed: dict, role_id: str, grade: int, class_num: int) -> None:
+def build_admin_embed(
+    target: date,
+    events: list[str],
+    holiday: bool,
+    lunch: str | None,
+    dinner: str | None,
+    timetable_summary: list[dict],
+) -> dict:
+    day_names = ["월", "화", "수", "목", "금"]
+    day = day_names[target.weekday()]
+
+    has_any_timetable = any(t["subjects"] for t in timetable_summary)
+
+    if holiday:
+        send_status = f"❌ 알림 전송 안 함 ({', '.join(events)})"
+        color = 0xE74C3C
+    elif lunch is None and not has_any_timetable:
+        send_status = "❓ 전송 여부 불확실 (급식 + 시간표 API 모두 없음)"
+        color = 0xE67E22
+    elif lunch is None:
+        send_status = "⚠️ 급식 없음 (시간표는 정상) - override 입력 필요"
+        color = 0xE67E22
+    else:
+        send_status = "✅ 알림 전송 예정"
+        color = 0x2ECC71
+
+    # 반별 시간표 요약
+    timetable_lines = []
+    warnings = []
+    for t in timetable_summary:
+        subjects = t["subjects"]
+        source = t["source"]
+        grade = t["grade"]
+        class_num = t["class_num"]
+        normal_count = t["normal_count"]
+        label = f"{grade}-{class_num}"
+
+        if not subjects:
+            timetable_lines.append(f"{label}: ⚠️ API 없음")
+        else:
+            count = len(subjects)
+            first = subjects[0]
+            last = subjects[-1]
+            line = f"{label}: {count}교시 ({first} ~ {last}) {source}"
+            if count < normal_count:
+                line += f" ⚠️ 평소 {normal_count}교시"
+                warnings.append(f"{label}: {count}교시 (평소 {normal_count}교시)")
+            elif count > normal_count:
+                line += f" 📢 평소 {normal_count}교시"
+            timetable_lines.append(line)
+
+    fields = [
+        {
+            "name": "📚 시간표",
+            "value": "\n".join(timetable_lines)[:1024],
+            "inline": False,
+        },
+        {
+            "name": "🍱 중식",
+            "value": summarize_meal(lunch),
+            "inline": True,
+        },
+        {
+            "name": "🌙 석식",
+            "value": summarize_meal(dinner),
+            "inline": True,
+        },
+    ]
+
+    if warnings:
+        fields.append({
+            "name": "⚠️ 시간표 확인 필요",
+            "value": "\n".join(warnings) + "\noverride.json 입력하거나 API가 맞으면 무시하세요",
+            "inline": False,
+        })
+
+    if lunch is None and not has_any_timetable:
+        fields.append({
+            "name": "👉 안내",
+            "value": "휴일이거나 NEIS 장애입니다\n확인 후 판단하세요",
+            "inline": False,
+        })
+    elif lunch is None:
+        fields.append({
+            "name": "👉 안내",
+            "value": "override.json 에 급식 입력 후\nworkflow 수동 실행하세요",
+            "inline": False,
+        })
+
+    return {
+        "title": f"📋 {target.strftime('%Y-%m-%d')} ({day}요일) 내일 미리보기",
+        "description": send_status,
+        "color": color,
+        "fields": fields,
+        "footer": {"text": "동양고등학교 관리자"},
+    }
+
+
+def send_discord(session: requests.Session, webhook_url: str, content: str, embed: dict, label: str) -> None:
     try:
-        res = session.post(webhook_url, json={"content": f"<@&{role_id}>", "embeds": [embed]}, timeout=10)
+        res = session.post(webhook_url, json={"content": content, "embeds": [embed]}, timeout=10)
         res.raise_for_status()
-        log.info(f"{grade}학년 {class_num}반 디스코드 전송 성공")
+        log.info(f"{label} 디스코드 전송 성공")
     except Exception as e:
-        log.error(f"{grade}학년 {class_num}반 디스코드 전송 실패: {e}")
+        log.error(f"{label} 디스코드 전송 실패: {e}")
         try:
             session.post(webhook_url, json={"content": f"오류 발생: {e}"}, timeout=10)
         except Exception:
             pass
 
 
-def main() -> None:
+def send_admin(session: requests.Session, admin_webhook: str, embed: dict) -> None:
+    send_discord(session, admin_webhook, "", embed, "관리자")
+
+
+def main_morning() -> None:
     today = datetime.now(KST).date()
 
     if today.weekday() >= 5:
@@ -276,6 +417,7 @@ def main() -> None:
 
     try:
         neis_key = get_env(NEIS_KEY_ENV)
+        admin_webhook = get_env(ADMIN_WEBHOOK_ENV)
     except EnvironmentError as e:
         log.error(e)
         return
@@ -283,9 +425,31 @@ def main() -> None:
     with requests.Session() as session:
         events = get_schedule_events(session, neis_key, today)
         if is_holiday(events):
+            log.info("휴일이므로 전송 생략")
             return
 
-        meal_fields = get_meals(session, neis_key, today)
+        override = load_override(today)
+        meals = get_meals(session, neis_key, today, override)
+
+        if meals is None:
+            # 시간표 API 테스트 (1반만)
+            test_subjects = get_timetable_api(session, neis_key, today, 1, 1)
+            if test_subjects:
+                embed = {
+                    "title": "⚠️ 오늘 알림 전송 안 함",
+                    "description": "급식 API 실패 + override 없음\n시간표 API는 정상\noverride.json 입력 후 수동 실행하세요",
+                    "color": 0xE67E22,
+                }
+            else:
+                embed = {
+                    "title": "❓ 오늘 알림 전송 안 함",
+                    "description": "급식 + 시간표 API 모두 없음\n휴일이거나 NEIS 장애\n확인 후 판단하세요",
+                    "color": 0xE74C3C,
+                }
+            send_admin(session, admin_webhook, embed)
+            return
+
+        lunch, dinner = meals
 
         for (grade, class_num), info in CLASSES.items():
             webhook_url = os.environ.get(info["webhook_env"])
@@ -293,14 +457,69 @@ def main() -> None:
                 log.warning(f"{grade}학년 {class_num}반 Webhook 없음, 건너뜀")
                 continue
 
-            subjects = get_timetable_api(session, neis_key, today, grade, class_num)
-            source = "NEIS"
-            if not subjects:
-                subjects = info["timetable"].get(today.weekday(), [])
-                source = "저장됨"
+            normal_count = len(info["timetable"].get(today.weekday(), []))
 
-            embed = build_embed(today, grade, class_num, subjects, source, meal_fields, events)
-            send_discord(session, webhook_url, embed, info["role_id"], grade, class_num)
+            # timetable override 확인
+            timetable_key = f"{grade}-{class_num}"
+            timetable_override = override.get("timetable", {}).get(timetable_key)
+
+            if timetable_override:
+                log.info(f"{grade}학년 {class_num}반 시간표 override 사용")
+                subjects = timetable_override
+                source = "📋 override"
+            else:
+                subjects = get_timetable_api(session, neis_key, today, grade, class_num)
+                source = "📡 NEIS"
+                if not subjects:
+                    subjects = info["timetable"].get(today.weekday(), [])
+                    source = "📋 저장됨"
+
+            embed = build_embed(today, grade, class_num, subjects, source, lunch, dinner, events, normal_count)
+            send_discord(session, webhook_url, f"<@&{info['role_id']}>", embed, f"{grade}학년 {class_num}반")
 
 
-main()
+def main_preview() -> None:
+    today = datetime.now(KST).date()
+    tomorrow = today + timedelta(days=1)
+
+    if tomorrow.weekday() >= 5:
+        log.info("내일 주말이므로 미리보기 생략")
+        return
+
+    try:
+        neis_key = get_env(NEIS_KEY_ENV)
+        admin_webhook = get_env(ADMIN_WEBHOOK_ENV)
+    except EnvironmentError as e:
+        log.error(e)
+        return
+
+    with requests.Session() as session:
+        events = get_schedule_events(session, neis_key, tomorrow)
+        holiday = is_holiday(events)
+
+        lunch = fetch_meal(session, neis_key, tomorrow, "2")
+        dinner = fetch_meal(session, neis_key, tomorrow, "3") if tomorrow.weekday() != 2 else None
+
+        timetable_summary = []
+        for (grade, class_num), info in CLASSES.items():
+            subjects = get_timetable_api(session, neis_key, tomorrow, grade, class_num)
+            normal_count = len(info["timetable"].get(tomorrow.weekday(), []))
+            source = "📡" if subjects else "⚠️"
+            timetable_summary.append({
+                "grade": grade,
+                "class_num": class_num,
+                "subjects": subjects or [],
+                "source": source,
+                "normal_count": normal_count,
+            })
+
+        embed = build_admin_embed(tomorrow, events, holiday, lunch, dinner, timetable_summary)
+        send_admin(session, admin_webhook, embed)
+
+
+if __name__ == "__main__":
+    mode = sys.argv[1] if len(sys.argv) > 1 else "morning"
+    if mode == "preview":
+        main_preview()
+    else:
+        main_morning()
