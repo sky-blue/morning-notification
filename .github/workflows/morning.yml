@@ -20,7 +20,7 @@ jobs:
           python-version: '3.11'
       - run: pip install requests
       - name: 아침 알림
-        if: github.event.schedule == '0 20 * * *' || github.event.inputs.mode == 'morning'
+        if: github.event.schedule == '0 20 * * *' || github.event.inputs.mode == 'morning' || github.event.inputs.mode == ''
         run: python send-discord.py morning
         env:
           NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
