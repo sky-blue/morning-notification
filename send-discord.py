@@ -426,6 +426,11 @@ def main_morning() -> None:
         events = get_schedule_events(session, neis_key, today)
         if is_holiday(events):
             log.info("휴일이므로 전송 생략")
+            send_admin(session, admin_webhook, {
+                "title": "❌ 오늘 알림 전송 안 함",
+                "description": f"휴일 감지: {', '.join(events)}",
+                "color": 0xE74C3C,
+            })
             return
 
         override = load_override(today)
