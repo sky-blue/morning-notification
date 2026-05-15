@@ -2,8 +2,8 @@ name: 매일 아침 알림
 
 on:
   schedule:
-    - cron: '0 20 * * *'   # 한국시간 오전 5시 (아침 알림)
-    - cron: '0 13 * * *'   # 한국시간 저녁 10시 (관리자 미리보기)
+    - cron: '0 20 * * *'   # 한국시간 오전 5시
+    - cron: '0 13 * * *'   # 한국시간 저녁 10시
   workflow_dispatch:
     inputs:
       mode:
@@ -37,9 +37,3 @@ jobs:
         env:
           NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
           DISCORD_WEBHOOK_ADMIN: ${{ secrets.DISCORD_WEBHOOK_ADMIN }}
-          DISCORD_WEBHOOK_1_1: ${{ secrets.DISCORD_WEBHOOK_1_1 }}
-          DISCORD_WEBHOOK_1_2: ${{ secrets.DISCORD_WEBHOOK_1_2 }}
-          DISCORD_WEBHOOK_1_3: ${{ secrets.DISCORD_WEBHOOK_1_3 }}
-          DISCORD_WEBHOOK_1_4: ${{ secrets.DISCORD_WEBHOOK_1_4 }}
-          DISCORD_WEBHOOK_1_5: ${{ secrets.DISCORD_WEBHOOK_1_5 }}
-          DISCORD_WEBHOOK_1_6: ${{ secrets.DISCORD_WEBHOOK_1_6 }}
