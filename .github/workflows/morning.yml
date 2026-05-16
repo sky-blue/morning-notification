@@ -8,7 +8,7 @@ on:
     inputs:
       mode:
         description: 'morning or preview'
-        default: 'morning'
+        required: true
 
 jobs:
   send-discord:
@@ -20,7 +20,7 @@ jobs:
           python-version: '3.11'
       - run: pip install requests
       - name: 아침 알림
-        if: github.event.schedule == '0 20 * * *' || github.event.inputs.mode == 'morning' || github.event.inputs.mode == ''
+        if: github.event.schedule == '0 20 * * *' || github.event.inputs.mode == 'morning'
         run: python send-discord.py morning
         env:
           NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
@@ -32,7 +32,7 @@ jobs:
           DISCORD_WEBHOOK_1_5: ${{ secrets.DISCORD_WEBHOOK_1_5 }}
           DISCORD_WEBHOOK_1_6: ${{ secrets.DISCORD_WEBHOOK_1_6 }}
       - name: 관리자 미리보기
-        if: github.event.schedule == '0 13 * * *' || github.event.inputs.mode == 'preview'
+        if: github.event.schedule == '0 11 * * *' || github.event.inputs.mode == 'preview'
         run: python send-discord.py preview
         env:
           NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
