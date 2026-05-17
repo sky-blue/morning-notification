@@ -247,6 +247,7 @@ def summarize_meal(meal: str | None) -> str:
     return f"{lines[0]} 외 {len(lines)-1}종"
 
 
+
 def build_embed(
     today: date,
     grade: int,
@@ -266,7 +267,9 @@ def build_embed(
     if api_success and len(subjects) != normal_count:
         timetable_value += f"\n(오늘 {len(subjects)}교시 / 평소 {normal_count}교시)"
 
-    description = f"학사일정: {', '.join(events)}" if events else ""
+    timetable_value += "\n\u200b"  # 시간표 뒤 빈 줄
+
+    description = f"학사일정: {', '.join(events)}\n\u200b" if events else ""
 
     fields = [
         {
@@ -277,7 +280,7 @@ def build_embed(
         {
             "name": "🍱 중식",
             "value": lunch[:1024],
-            "inline": False,
+            "inline": True,
         },
     ]
 
@@ -285,7 +288,7 @@ def build_embed(
         fields.append({
             "name": "🌙 석식",
             "value": dinner[:1024],
-            "inline": False,
+            "inline": True,
         })
 
     return {
@@ -345,10 +348,12 @@ def build_admin_embed(
                 warnings.append(f"{label}: {count}교시 (평소 {normal_count}교시)")
             timetable_lines.append(line)
 
+    timetable_value = "\n".join(timetable_lines) + "\n\u200b"  # 시간표 뒤 빈 줄
+
     fields = [
         {
             "name": "시간표",
-            "value": "\n".join(timetable_lines)[:1024],
+            "value": timetable_value[:1024],
             "inline": False,
         },
         {
@@ -385,12 +390,11 @@ def build_admin_embed(
 
     return {
         "title": f"📋 {target.strftime('%Y-%m-%d')} ({day}요일) 내일 미리보기",
-        "description": f"{send_status}\n",
+        "description": f"{send_status}\n\u200b",
         "color": color,
         "fields": fields,
         "footer": {"text": "동양고등학교 관리자"},
     }
-
 
 def send_discord(session: requests.Session, webhook_url: str, content: str, embed: dict, label: str) -> None:
     try:
@@ -429,7 +433,7 @@ def main_morning() -> None:
             log.info("휴일이므로 전송 생략")
             send_admin(session, admin_webhook, {
                 "title": "❌ 오늘 알림 전송 안 함",
-                "description": f"휴일 감지: {', '.join(events)}",
+                "description": f"휴일 감지: {', '.join(events)}\n\u200b",
                 "color": 0xE74C3C,
             })
             return
@@ -442,13 +446,13 @@ def main_morning() -> None:
             if test_subjects:
                 send_admin(session, admin_webhook, {
                     "title": "⚠️ 오늘 알림 전송 안 함",
-                    "description": "급식 API 실패 + override 없음\n시간표 API는 정상\noverride.json 입력 후 수동 실행하세요",
+                    "description": "급식 API 실패 + override 없음\n시간표 API는 정상\noverride.json 입력 후 수동 실행하세요\n\u200b",
                     "color": 0xE67E22,
                 })
             else:
                 send_admin(session, admin_webhook, {
                     "title": "❓ 오늘 알림 전송 안 함",
-                    "description": "급식 + 시간표 API 모두 없음\n휴일이거나 NEIS 장애\n확인 후 판단하세요",
+                    "description": "급식 + 시간표 API 모두 없음\n휴일이거나 NEIS 장애\n확인 후 판단하세요\n\u200b",
                     "color": 0xE74C3C,
                 })
             return
