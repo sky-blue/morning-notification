@@ -15,6 +15,7 @@ ADMIN_WEBHOOK_ENV = "DISCORD_WEBHOOK_ADMIN"
 OFFICE_CODE = "B10"
 SCHOOL_CODE = "7010965"
 KST = ZoneInfo("Asia/Seoul")
+ADMIN_ROLE_ID = 1503038580946108507
 
 HOLIDAY_KEYWORDS = [
     "휴업일",
@@ -405,8 +406,7 @@ def send_discord(session: requests.Session, webhook_url: str, content: str, embe
 
 
 def send_admin(session: requests.Session, admin_webhook: str, embed: dict) -> None:
-    send_discord(session, admin_webhook, "", embed, "관리자")
-
+    send_discord(session, admin_webhook, f"<@&{ADMIN_ROLE_ID}>", embed, "관리자")
 
 def main_morning() -> None:
     today = datetime.now(KST).date()
