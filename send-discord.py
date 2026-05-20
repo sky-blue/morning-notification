@@ -238,6 +238,61 @@ def get_timetable_api(session: requests.Session, key: str, target: date, grade: 
         return None
 
 
+def compare_timetable(local: list[str], api: list[str]) -> list[dict]:
+    """로컬 시간표와 API 시간표 비교, 변동 내역 반환"""
+    changes = []
+    max_len = max(len(local), len(api))
+
+    for i in range(max_len):
+        local_s = local[i] if i < len(local) else None
+        api_s = api[i] if i < len(api) else None
+
+        if local_s == api_s:
+            changes.append({"perio": i + 1, "subject": api_s, "type": "same"})
+        elif local_s and api_s:
+            changes.append({"perio": i + 1, "subject": api_s, "type": "changed", "from": local_s, "to": api_s})
+        elif local_s and not api_s:
+            changes.append({"perio": i + 1, "subject": None, "type": "removed", "from": local_s})
+        elif not local_s and api_s:
+            changes.append({"perio": i + 1, "subject": api_s, "type": "added", "to": api_s})
+
+    return changes
+
+
+def has_changes(changes: list[dict]) -> bool:
+    return any(c["type"] != "same" for c in changes)
+
+
+def format_timetable_student(changes: list[dict]) -> str:
+    """학생 채널용 시간표 문자열"""
+    lines = []
+    for c in changes:
+        perio = c["perio"]
+        if c["type"] == "same":
+            lines.append(f"`{perio}교시` {c['subject']}")
+        elif c["type"] == "changed":
+            lines.append(f"`{perio}교시` {c['to']} ({c['from']} → {c['to']})")
+        elif c["type"] == "removed":
+            lines.append(f"`{perio}교시` ~~{c['from']}~~ (없어짐)")
+        elif c["type"] == "added":
+            lines.append(f"`{perio}교시` {c['to']} (추가됨)")
+    return "\n".join(lines)
+
+
+def format_timetable_admin(changes: list[dict]) -> str:
+    """관리자 채널용 변동 내역 문자열"""
+    lines = []
+    for c in changes:
+        perio = c["perio"]
+        if c["type"] == "changed":
+            lines.append(f"{perio}교시 {c['from']} → {c['to']}")
+        elif c["type"] == "removed":
+            lines.append(f"{perio}교시 {c['from']} → 없어짐")
+        elif c["type"] == "added":
+            lines.append(f"{perio}교시 추가됨 → {c['to']}")
+    return "\n".join(lines)
+
+
 def summarize_meal(meal: str | None) -> str:
     if not meal:
         return "없음"
@@ -247,33 +302,36 @@ def summarize_meal(meal: str | None) -> str:
     return f"{lines[0]} 외 {len(lines)-1}종"
 
 
-
 def build_embed(
     today: date,
     grade: int,
     class_num: int,
     subjects: list[str],
-    api_success: bool,
+    local_subjects: list[str],
+    source: str,
     lunch: str,
     dinner: str | None,
     events: list[str],
-    normal_count: int,
 ) -> dict:
     day_names = ["월", "화", "수", "목", "금"]
     day = day_names[today.weekday()]
 
-    timetable_value = "\n".join(f"`{i+1}교시` {s}" for i, s in enumerate(subjects))
+    # 변동 비교 (API 또는 override일 때만)
+    if source in ("NEIS", "override"):
+        changes = compare_timetable(local_subjects, subjects)
+        changed = has_changes(changes)
+        timetable_value = format_timetable_student(changes)
+        timetable_name = "시간표 (변동있음)" if changed else "시간표"
+    else:
+        timetable_value = "\n".join(f"`{i+1}교시` {s}" for i, s in enumerate(subjects))
+        timetable_name = "시간표 (저장됨)"
 
-    if api_success and len(subjects) != normal_count:
-        timetable_value += f"\n(오늘 {len(subjects)}교시 / 평소 {normal_count}교시)"
-
-    timetable_value += "\n\u200b"  # 시간표 뒤 빈 줄
-
+    timetable_value += "\n\u200b"
     description = f"학사일정: {', '.join(events)}\n\u200b" if events else ""
 
     fields = [
         {
-            "name": "시간표",
+            "name": timetable_name,
             "value": timetable_value[:1024],
             "inline": False,
         },
@@ -330,9 +388,11 @@ def build_admin_embed(
         send_status += f"\n학사일정: {', '.join(events)}"
 
     timetable_lines = []
-    warnings = []
+    timetable_warnings = []
+
     for t in timetable_summary:
         subjects = t["subjects"]
+        local_subjects = t["local_subjects"]
         normal_count = t["normal_count"]
         label = f"{t['grade']}-{t['class_num']}"
 
@@ -344,11 +404,16 @@ def build_admin_embed(
             last = subjects[-1]
             line = f"{label}: {count}교시 ({first} ~ {last})"
             if count != normal_count:
-                line += f" (평소 {normal_count}교시)"
-                warnings.append(f"{label}: {count}교시 (평소 {normal_count}교시)")
+                line += f" ⚠️(평소 {normal_count}교시)"
             timetable_lines.append(line)
 
-    timetable_value = "\n".join(timetable_lines) + "\n\u200b"  # 시간표 뒤 빈 줄
+            # 변동 감지
+            changes = compare_timetable(local_subjects, subjects)
+            if has_changes(changes):
+                admin_diff = format_timetable_admin(changes)
+                timetable_warnings.append(f"{label}\n{admin_diff}")
+
+    timetable_value = "\n".join(timetable_lines) + "\n\u200b"
 
     fields = [
         {
@@ -368,10 +433,12 @@ def build_admin_embed(
         },
     ]
 
-    if warnings:
+    if timetable_warnings:
+        warning_value = f"\n\u200b\n".join(timetable_warnings)
+        warning_value += "\noverride.json 입력하거나 API가 맞으면 무시하세요"
         fields.append({
             "name": "⚠️ 시간표 확인 필요",
-            "value": "\n".join(warnings) + "\noverride.json 입력하거나 API가 맞으면 무시하세요",
+            "value": warning_value[:1024],
             "inline": False,
         })
 
@@ -395,6 +462,7 @@ def build_admin_embed(
         "fields": fields,
         "footer": {"text": "동양고등학교 관리자"},
     }
+
 
 def send_discord(session: requests.Session, webhook_url: str, content: str, embed: dict, label: str) -> None:
     try:
@@ -433,7 +501,7 @@ def main_morning() -> None:
             log.info("휴일이므로 전송 생략")
             send_admin(session, admin_webhook, {
                 "title": "❌ 오늘 알림 전송 안 함",
-                "description": f"휴일 감지: {', '.join(events)}\n\u200b",
+                "description": f"휴일 감지: {', '.join(events)}",
                 "color": 0xE74C3C,
             })
             return
@@ -446,13 +514,13 @@ def main_morning() -> None:
             if test_subjects:
                 send_admin(session, admin_webhook, {
                     "title": "⚠️ 오늘 알림 전송 안 함",
-                    "description": "급식 API 실패 + override 없음\n시간표 API는 정상\noverride.json 입력 후 수동 실행하세요\n\u200b",
+                    "description": "급식 API 실패 + override 없음\n시간표 API는 정상\noverride.json 입력 후 수동 실행하세요",
                     "color": 0xE67E22,
                 })
             else:
                 send_admin(session, admin_webhook, {
                     "title": "❓ 오늘 알림 전송 안 함",
-                    "description": "급식 + 시간표 API 모두 없음\n휴일이거나 NEIS 장애\n확인 후 판단하세요\n\u200b",
+                    "description": "급식 + 시간표 API 모두 없음\n휴일이거나 NEIS 장애\n확인 후 판단하세요",
                     "color": 0xE74C3C,
                 })
             return
@@ -465,24 +533,24 @@ def main_morning() -> None:
                 log.warning(f"{grade}학년 {class_num}반 Webhook 없음, 건너뜀")
                 continue
 
-            normal_count = len(info["timetable"].get(today.weekday(), []))
+            local_subjects = info["timetable"].get(today.weekday(), [])
             timetable_key = f"{grade}-{class_num}"
             timetable_override = override.get("timetable", {}).get(timetable_key)
 
             if timetable_override:
                 log.info(f"{grade}학년 {class_num}반 시간표 override 사용")
                 subjects = timetable_override
-                api_success = False
+                source = "override"
             else:
                 api_subjects = get_timetable_api(session, neis_key, today, grade, class_num)
                 if api_subjects:
                     subjects = api_subjects
-                    api_success = True
+                    source = "NEIS"
                 else:
-                    subjects = info["timetable"].get(today.weekday(), [])
-                    api_success = False
+                    subjects = local_subjects
+                    source = "저장됨"
 
-            embed = build_embed(today, grade, class_num, subjects, api_success, lunch, dinner, events, normal_count)
+            embed = build_embed(today, grade, class_num, subjects, local_subjects, source, lunch, dinner, events)
             send_discord(session, webhook_url, f"<@&{info['role_id']}>", embed, f"{grade}학년 {class_num}반")
 
 
@@ -511,11 +579,13 @@ def main_preview() -> None:
         timetable_summary = []
         for (grade, class_num), info in CLASSES.items():
             subjects = get_timetable_api(session, neis_key, tomorrow, grade, class_num)
-            normal_count = len(info["timetable"].get(tomorrow.weekday(), []))
+            local_subjects = info["timetable"].get(tomorrow.weekday(), [])
+            normal_count = len(local_subjects)
             timetable_summary.append({
                 "grade": grade,
                 "class_num": class_num,
                 "subjects": subjects or [],
+                "local_subjects": local_subjects,
                 "normal_count": normal_count,
             })
 
