@@ -22,7 +22,7 @@ HOLIDAY_KEYWORDS = [
     "재량휴업일",
     "방학",
     "수련활동",
-    # "공휴일"
+    "공휴일"
 ]
 
 DAY_COLORS = {
@@ -452,7 +452,7 @@ def build_admin_embed(
     elif lunch is None:
         fields.append({
             "name": "📢 안내",
-            "value": "override.json 에 급식 입력 후\nworkflow 수동 실행하세요",
+            "value": "override.json 에 급식 입력하세요",
             "inline": False,
         })
 
