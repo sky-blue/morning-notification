@@ -22,6 +22,7 @@ HOLIDAY_KEYWORDS = [
     "재량휴업일",
     "방학",
     "수련활동",
+    # "공휴일"
 ]
 
 DAY_COLORS = {
@@ -435,7 +436,7 @@ def build_admin_embed(
 
     if timetable_warnings:
         warning_value = f"\n\u200b\n".join(timetable_warnings)
-        warning_value += "\noverride.json 입력하거나 API가 맞으면 무시하세요"
+        # warning_value += "\noverride.json 입력하거나 API가 맞으면 무시하세요"
         fields.append({
             "name": "⚠️ 시간표 확인 필요",
             "value": warning_value[:1024],
@@ -444,13 +445,13 @@ def build_admin_embed(
 
     if lunch is None and not has_any_timetable:
         fields.append({
-            "name": "안내",
+            "name": "📢 안내",
             "value": "휴일이거나 NEIS 장애입니다\n확인 후 판단하세요",
             "inline": False,
         })
     elif lunch is None:
         fields.append({
-            "name": "안내",
+            "name": "📢 안내",
             "value": "override.json 에 급식 입력 후\nworkflow 수동 실행하세요",
             "inline": False,
         })
