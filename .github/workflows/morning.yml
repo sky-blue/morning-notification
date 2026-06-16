@@ -2,8 +2,8 @@ name: 매일 아침 알림
 
 on:
   schedule:
-    - cron: '0 20 * * *'   # 한국시간 오전 5시
-    - cron: '0 11 * * *'   # 한국시간 저녁 8시
+    - cron: '0 19 * * *'   # 한국시간 오전 5시
+    - cron: '0 10 * * *'   # 한국시간 저녁 8시
   workflow_dispatch:
     inputs:
       mode:
