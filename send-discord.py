@@ -19,8 +19,7 @@ KST = ZoneInfo("Asia/Seoul")
 
 HOLIDAY_KEYWORDS = [
     "휴업일",
-    "재량휴업일",
-    "방학",
+    "재량휴업일",,
     "수련활동",
     "공휴일"
 ]
