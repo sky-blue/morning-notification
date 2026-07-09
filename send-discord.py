@@ -557,6 +557,7 @@ def main_morning() -> None:
 def main_preview() -> None:
     today = datetime.now(KST).date()
     tomorrow = today + timedelta(days=1)
+    override = load_override(tomorrow)
 
     if tomorrow.weekday() >= 5:
         log.info("내일 주말이므로 미리보기 생략")
@@ -573,12 +574,23 @@ def main_preview() -> None:
         events = get_schedule_events(session, neis_key, tomorrow)
         holiday = is_holiday(events)
 
-        lunch = fetch_meal(session, neis_key, tomorrow, "2")
-        dinner = fetch_meal(session, neis_key, tomorrow, "3") if tomorrow.weekday() != 2 else None
+        meals = get_meals(session, neis_key, tomorrow, override)
+
+        if meals:
+            lunch, dinner = meals
+        else:
+            lunch, dinner = None, None
 
         timetable_summary = []
         for (grade, class_num), info in CLASSES.items():
-            subjects = get_timetable_api(session, neis_key, tomorrow, grade, class_num)
+            timetable_key = f"{grade}-{class_num}"
+            timetable_override = override.get("timetable", {}).get(timetable_key)
+
+            if timetable_override:
+                subjects = timetable_override
+            else:
+                subjects = get_timetable_api(session, neis_key, tomorrow, grade, class_num)
+
             local_subjects = info["timetable"].get(tomorrow.weekday(), [])
             normal_count = len(local_subjects)
             timetable_summary.append({
