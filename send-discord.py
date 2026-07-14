@@ -24,14 +24,6 @@ HOLIDAY_KEYWORDS = [
     "공휴일"
 ]
 
-DAY_COLORS = {
-    0: 0x3498DB,
-    1: 0xE74C3C,
-    2: 0x2ECC71,
-    3: 0xE67E22,
-    4: 0x9B59B6,
-}
-
 CLASSES = {
     (1, 1): {
         "webhook_env": "DISCORD_WEBHOOK_1_1",
@@ -352,7 +344,7 @@ def build_embed(
     return {
         "title": f"{today.strftime('%Y-%m-%d')} {day}요일 좋은 아침!",
         "description": description,
-        "color": DAY_COLORS.get(today.weekday(), 0x95A5A6),
+        "color": 0x3498DB,
         "fields": fields,
         "footer": {"text": f"동양고등학교 {grade}학년 {class_num}반"},
     }
