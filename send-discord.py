@@ -471,10 +471,10 @@ def send_discord(session: requests.Session, webhook_url: str, content: str, embe
         log.info(f"{label} 디스코드 전송 성공")
     except Exception as e:
         log.error(f"{label} 디스코드 전송 실패: {e}")
-        try:
-            session.post(webhook_url, json={"content": f"오류 발생: {e}"}, timeout=10)
-        except Exception:
-            pass
+        # try:
+        #     session.post(webhook_url, json={"content": f"오류 발생: {e}"}, timeout=10)
+        # except Exception:
+        #     pass
 
 
 def send_admin(session: requests.Session, admin_webhook: str, embed: dict) -> None:
