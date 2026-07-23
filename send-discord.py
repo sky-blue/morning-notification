@@ -18,7 +18,7 @@ SCHOOL_CODE = "7010965"
 KST = ZoneInfo("Asia/Seoul")
 
 HOLIDAY_KEYWORDS = [
-    "방학",
+#    "방학",
     "재량휴업일",
     "수련활동",
     "공휴일"
