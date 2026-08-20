@@ -2,7 +2,7 @@ name: 매일 아침 알림
 
 on:
   schedule:
-    - cron: '0 19 * * *'   # 한국시간 오전 4시
+    - cron: '0 20 * * *'   # 한국시간 오전 4시
     - cron: '0 10 * * *'   # 한국시간 저녁 7시
   workflow_dispatch:
     inputs:
@@ -20,7 +20,7 @@ jobs:
           python-version: '3.11'
       - run: pip install requests
       - name: 아침 알림
-        if: github.event.schedule == '0 19 * * *' || github.event.inputs.mode == 'morning'
+        if: github.event.schedule == '0 20 * * *' || github.event.inputs.mode == 'morning'
         run: python send-discord.py morning
         env:
           NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
