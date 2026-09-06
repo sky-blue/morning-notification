@@ -2,8 +2,8 @@ name: 매일 아침 알림
 
 on:
   schedule:
-    - cron: '2 20 * * *'   # 한국시간 오전 시
-    - cron: '2 10 * * *'   # 한국시간 저녁 7시
+    - cron: '14 19 * * *'   # 한국시간 오전 시
+    - cron: '14 9 * * *'   # 한국시간 저녁 7시
   workflow_dispatch:
     inputs:
       mode:
@@ -20,7 +20,7 @@ jobs:
           python-version: '3.11'
       - run: pip install requests
       - name: 아침 알림
-        if: github.event.schedule == '2 20 * * *' || github.event.inputs.mode == 'morning'
+        if: github.event.schedule == '14 19 * * *' || github.event.inputs.mode == 'morning'
         run: python send-discord.py morning
         env:
           NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
@@ -32,7 +32,7 @@ jobs:
           DISCORD_WEBHOOK_1_5: ${{ secrets.DISCORD_WEBHOOK_1_5 }}
           DISCORD_WEBHOOK_1_6: ${{ secrets.DISCORD_WEBHOOK_1_6 }}
       - name: 관리자 미리보기
-        if: github.event.schedule == '2 10 * * *' || github.event.inputs.mode == 'preview'
+        if: github.event.schedule == '14 9 * * *' || github.event.inputs.mode == 'preview'
         run: python send-discord.py preview
         env:
           NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
